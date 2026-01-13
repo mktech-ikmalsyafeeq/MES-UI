@@ -1,0 +1,25 @@
+name: Docker Image CI
+
+on:
+  [workflow_dispatch]
+
+jobs:
+
+  publish_images:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: build image
+        run: docker build mes-ui -t mktech-ikmalsyafeeq/MES-UI:latest
+
+      - name: push image to docker hub
+        run: |
+          docker push mktech-ikmalsyafeeq/MES-UI:latest
+
+
+    - uses: actions/checkout@v4
+    - name: Build the Docker image
+      run: docker build . --file Dockerfile --tag my-image-name:$(date +%s)
+ 
