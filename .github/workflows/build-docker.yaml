@@ -26,12 +26,7 @@ jobs:
         CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
         CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
       run: |
-        ssh -o "ProxyCommand=./cloudflared access ssh \
-          --hostname ssh.mktechsb.com \
-          --service-token-id $CF_ACCESS_CLIENT_ID \
-          --service-token-secret $CF_ACCESS_CLIENT_SECRET" \
-          -i ~/.ssh/id_ed25519 \
-          dev@ssh.mktechsb.com << 'EOF'
+        ssh -o "ProxyCommand=cloudflared access ssh --hostname ssh.mktechsb.com" dev@ssh.mktechsb.com << 'EOF'
 
           cd ~/MES-UI || exit 1
           git fetch --all
