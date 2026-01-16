@@ -1,54 +1,45 @@
-name: Deploy MES-UI via Cloudflare Tunnel
+name: Deploy MES-UI via Cloudflare Access
 
 on:
   push:
     branches:
-      - main   # Trigger deployment on push to main branch
+      - main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-    # 1️⃣ Checkout code (optional, only if building locally)
-    - name: Checkout repository
-      uses: actions/checkout@v3
-
-    # 2️⃣ Install cloudflared
     - name: Install cloudflared
       run: |
         wget -O cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
         chmod +x cloudflared
 
-    # 3️⃣ Setup SSH private key
     - name: Setup SSH key
       run: |
         mkdir -p ~/.ssh
         echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_ed25519
         chmod 600 ~/.ssh/id_ed25519
 
-    # 4️⃣ SSH and deploy MES-UI
-    - name: SSH Deploy MES-UI
+    - name: Deploy via SSH
+      env:
+        CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+        CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
       run: |
-        ssh -o "ProxyCommand=./cloudflared access ssh --hostname ssh.mktechsb.com" \
-            -i ~/.ssh/id_ed25519 \
-            dev@ssh.mktechsb.com << 'EOF'
-          echo "Navigating to MES-UI repo..."
-          cd ~/MES-UI || { echo "MES-UI repo not found"; exit 1; }
+        ssh -o "ProxyCommand=./cloudflared access ssh \
+          --hostname ssh.mktechsb.com \
+          --service-token-id $CF_ACCESS_CLIENT_ID \
+          --service-token-secret $CF_ACCESS_CLIENT_SECRET" \
+          -i ~/.ssh/id_ed25519 \
+          dev@ssh.mktechsb.com << 'EOF'
 
-          echo "Updating repository..."
+          cd ~/MES-UI || exit 1
           git fetch --all
           git reset --hard origin/main
 
-          echo "Building Docker image..."
-          docker build -t mes-ui MES-UI
-
-          echo "Stopping existing container (if any)..."
+          docker build -t mes-ui .
           docker stop mes-ui || true
           docker rm mes-ui || true
-
-          echo "Running Docker container..."
           docker run -d -p 4200:80 --name mes-ui mes-ui
 
-          echo "Deployment completed!"
         EOF
