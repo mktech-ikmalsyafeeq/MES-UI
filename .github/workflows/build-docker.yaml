@@ -31,7 +31,7 @@ jobs:
           ssh \
             -o "StrictHostKeyChecking=no" \
             -o "ProxyCommand=cloudflared access ssh \
-                --hostname ssh.mktechsb.com \
+                --hostname ssh.mktechsb.com:22 \
                 --id $CF_ACCESS_CLIENT_ID \
                 --secret $CF_ACCESS_CLIENT_SECRET" \
             dev@ssh.mktechsb.com \
