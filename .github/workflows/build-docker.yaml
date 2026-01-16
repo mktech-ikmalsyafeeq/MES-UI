@@ -3,19 +3,24 @@ name: SSH via Cloudflare Access
 on:
   push:
     branches:
-      - main
+      - main  # runs on push to main
+  workflow_dispatch:  # allows manual trigger too
 
 jobs:
   ssh:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
       - name: Install cloudflared
         run: |
           curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 \
             -o cloudflared
           chmod +x cloudflared
           sudo mv cloudflared /usr/local/bin/cloudflared
+          cloudflared --version
 
       - name: Setup SSH key
         run: |
@@ -23,12 +28,12 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
-      - name: SSH into server via Cloudflare Access
+      - name: Test SSH via Cloudflare Access
         env:
           CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
           CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
         run: |
-          ssh \
+          ssh -v \
             -o "StrictHostKeyChecking=no" \
             -o "ProxyCommand=cloudflared access ssh \
                 --hostname ssh.mktechsb.com:22 \
