@@ -1,39 +1,42 @@
-name: CI/CD MES-UI Docker Deployment
+name: Deploy mes-ui
 
 on:
   push:
     branches:
-      - main  # Trigger on pushes to main
+      - main   # Trigger on push to main branch
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout code (optional, only needed if you want local artifacts, otherwise can skip)
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    # 1. Checkout code (needed only if you want to build image locally before sending, optional)
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
-      # 2️⃣ SSH into the server and deploy
-      - name: Deploy to Ubuntu VM
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.VM_SSH_KEY }}
-          port: 22
-          script: |
-            echo "Deploying MES-UI on $(hostname)"
-            cd ~/MES-UI || exit 1
-            echo "Pulling latest code..."
-            git reset --hard
-            git clean -fd
-            git pull origin main
-            echo "Building Docker image..."
-            docker build -t mes-ui .
-            echo "Stopping old container if exists..."
-            docker stop mes-ui || true
-            docker rm mes-ui || true
-            echo "Running new container..."
-            docker run -d -p 4200:80 --name mes-ui mes-ui
-            echo "Deployment completed!"
+    # 2. SSH into server and run deployment steps
+    - name: Deploy to private server
+      uses: appleboy/ssh-action@v0.1.8
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SERVER_SSH_KEY }}
+        port: ${{ secrets.SERVER_SSH_PORT }}
+        script: |
+          echo "Navigating to mes-ui repo..."
+          cd ~/mes-ui || { echo "mes-ui repo not found"; exit 1; }
+
+          echo "Updating repository..."
+          git fetch --all
+          git reset --hard origin/main
+
+          echo "Building Docker image..."
+          docker build -t mes-ui:latest .
+
+          echo "Stopping existing container (if any)..."
+          docker rm -f mes-ui || true
+
+          echo "Running Docker container..."
+          docker run -d --name mes-ui -p 80:80 mes-ui:latest
+
+          echo "Deployment completed!"
