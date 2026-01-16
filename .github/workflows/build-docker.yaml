@@ -1,18 +1,16 @@
-name: Deploy MES-UI via Cloudflare Access
+name: SSH to Server Only
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:   # manual trigger (recommended for testing)
 
 jobs:
-  deploy:
+  ssh:
     runs-on: ubuntu-latest
 
     steps:
     - name: Install cloudflared
       run: |
-        wget -O cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+        wget -q -O cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
         chmod +x cloudflared
 
     - name: Setup SSH key
@@ -21,25 +19,20 @@ jobs:
         echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_ed25519
         chmod 600 ~/.ssh/id_ed25519
 
-    - name: Deploy via SSH
+    - name: SSH into server
       env:
         CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
         CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
       run: |
-        ssh -o "ProxyCommand=./cloudflared access ssh \
+        ssh -i ~/.ssh/id_ed25519 \
+          -o "ProxyCommand=./cloudflared access ssh \
           --hostname ssh.mktechsb.com \
           --service-token-id $CF_ACCESS_CLIENT_ID \
           --service-token-secret $CF_ACCESS_CLIENT_SECRET" \
-          -i ~/.ssh/id_ed25519 \
           dev@ssh.mktechsb.com << 'EOF'
-
-          cd ~/MES-UI || exit 1
-          git fetch --all
-          git reset --hard origin/main
-
-          docker build -t mes-ui .
-          docker stop mes-ui || true
-          docker rm mes-ui || true
-          docker run -d -p 4200:80 --name mes-ui mes-ui
-
+          
+          echo "✅ SSH connection successful"
+          hostname
+          whoami
+          
         EOF
