@@ -1,63 +1,54 @@
-name: Deploy mes-ui
+name: Deploy MES-UI via Cloudflare Tunnel
 
 on:
   push:
     branches:
-      - main   # Trigger on push to main branch
+      - main   # Trigger deployment on push to main branch
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. Checkout code
+    # 1️⃣ Checkout code (optional, only if building locally)
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    # 2. Install cloudflared (needed only if you plan to use ProxyCommand in SSH)
+    # 2️⃣ Install cloudflared
     - name: Install cloudflared
       run: |
         wget -O cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
         chmod +x cloudflared
 
-    # 3. Setup SSH config (optional, for ProxyCommand if using TCP tunnel)
-    - name: Setup SSH
+    # 3️⃣ Setup SSH private key
+    - name: Setup SSH key
       run: |
         mkdir -p ~/.ssh
         echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_ed25519
         chmod 600 ~/.ssh/id_ed25519
 
-        # If using plain TCP tunnel through Cloudflare (no Access):
-        echo "Host mes-ui-server
-          HostName ${{ secrets.SERVER_HOST }}
-          User ${{ secrets.SERVER_USER }}
-          Port ${{ secrets.SERVER_SSH_PORT }}
-          IdentityFile ~/.ssh/id_ed25519
-        " > ~/.ssh/config
-
-    # 4. SSH into server and deploy
-    - name: Deploy to private server
-      uses: appleboy/ssh-action@v0.1.8
-      with:
-        host: ${{ secrets.SERVER_HOST }}    # Cloudflare Tunnel hostname
-        username: ${{ secrets.SERVER_USER }}
-        key: ${{ secrets.SERVER_SSH_KEY }}
-        port: ${{ secrets.SERVER_SSH_PORT }} # usually 22
-        script: |
-          echo "Navigating to mes-ui repo..."
-          cd ~/mes-ui || { echo "mes-ui repo not found"; exit 1; }
+    # 4️⃣ SSH and deploy MES-UI
+    - name: SSH Deploy MES-UI
+      run: |
+        ssh -o "ProxyCommand=./cloudflared access ssh --hostname ssh.mktechsb.com" \
+            -i ~/.ssh/id_ed25519 \
+            dev@ssh.mktechsb.com << 'EOF'
+          echo "Navigating to MES-UI repo..."
+          cd ~/MES-UI || { echo "MES-UI repo not found"; exit 1; }
 
           echo "Updating repository..."
           git fetch --all
           git reset --hard origin/main
 
           echo "Building Docker image..."
-          docker build -t mes-ui:latest .
+          docker build -t mes-ui MES-UI
 
           echo "Stopping existing container (if any)..."
-          docker rm -f mes-ui || true
+          docker stop mes-ui || true
+          docker rm mes-ui || true
 
           echo "Running Docker container..."
-          docker run -d --name mes-ui -p 80:80 mes-ui:latest
+          docker run -d -p 4200:80 --name mes-ui mes-ui
 
           echo "Deployment completed!"
+        EOF
